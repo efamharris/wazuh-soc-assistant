@@ -1,0 +1,16 @@
+[Unit]
+Description=SOC Assistant chat UI
+After=network.target
+
+[Service]
+Type=simple
+User=<YOUR_LINUX_USER>
+WorkingDirectory=/home/<YOUR_LINUX_USER>/wazuh-soc-assistant
+EnvironmentFile=/home/<YOUR_LINUX_USER>/.config/soc-assistant/env
+ExecStart=/home/<YOUR_LINUX_USER>/wazuh-soc-assistant/venv/bin/python /home/<YOUR_LINUX_USER>/wazuh-soc-assistant/app.py
+Restart=on-failure
+RestartSec=5
+UMask=077
+
+[Install]
+WantedBy=multi-user.target

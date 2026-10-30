@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOC Assistant</title>
+<style>
+:root{
+  --brand:#2F5BEA; --brand-dark:#2349C4; --ring:rgba(47,91,234,.14);
+  --bg:#FFFFFF; --panel:#F7F8FA; --border:#E4E7EC; --text:#111827; --muted:#6B7280;
+  --bubble-user:#2F5BEA; --bubble-user-text:#FFFFFF; --bubble-bot:#F4F5F7; --code:#EBEEF3;
+  --composer-border:#C7D2FE; --shadow:0 8px 30px rgba(17,24,39,.10);
+}
+[data-theme="dark"]{
+  color-scheme:dark;
+  --brand:#4F7CFF; --brand-dark:#3B67E8; --ring:rgba(79,124,255,.22);
+  --bg:#171717; --panel:#1F1F1F; --border:#333333; --text:#ECECEC; --muted:#9A9A9A;
+  --bubble-user:#2F5BEA; --bubble-user-text:#FFFFFF; --bubble-bot:#212121; --code:#141414;
+  --composer-border:#3A4A7A; --shadow:0 8px 30px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box} html,body{height:100%;margin:0}
+body{font-family:"Manrope","Inter","Segoe UI",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:15px}
+main{height:100%;display:flex;flex-direction:column}
+
+/* top bar */
+header{display:flex;align-items:center;gap:12px;padding:14px 24px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px;letter-spacing:-.02em;white-space:nowrap}
+.logo svg{width:26px;height:26px;color:var(--brand)}
+#title{flex:1;text-align:center;color:var(--muted);font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.icons{display:flex;gap:4px}
+.ibtn{width:38px;height:38px;border:0;background:none;color:var(--text);border-radius:50%;cursor:pointer;font-size:17px;display:grid;place-items:center}
+.ibtn:hover{background:var(--panel)}
+
+/* history drawer */
+aside{position:fixed;top:0;left:0;bottom:0;width:300px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;transform:translateX(-102%);transition:transform .2s ease;z-index:20}
+body.hist-open aside{transform:none;box-shadow:var(--shadow)}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s;z-index:10}
+body.hist-open .scrim{opacity:1;pointer-events:auto}
+.ahead{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 6px;font-weight:700;font-size:16px}
+.hist{flex:1;overflow:auto;padding:4px 8px}
+.hist h4{margin:12px 8px 4px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.item{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-radius:10px;cursor:pointer;font-size:14px}
+.item:hover{background:var(--border)} .item.active{background:var(--border);border-left:3px solid var(--brand)}
+.item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item-meta{min-width:0;flex:1;display:flex;flex-direction:column;gap:3px;overflow:hidden}
+.item-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item-time{font-size:11px;color:var(--muted);white-space:nowrap}
+.item button{background:none;border:0;color:var(--muted);cursor:pointer;visibility:hidden;font-size:16px}
+.item:hover button{visibility:visible}
+.note{padding:10px 16px;font-size:12px;color:var(--muted);border-top:1px solid var(--border)}
+
+/* conversation */
+#msgs{flex:1;min-height:0;overflow:auto;padding:8px 0 0}
+.wrap{max-width:860px;margin:0 auto;padding:0 24px;min-height:100%;display:flex;flex-direction:column}
+.row{display:flex;margin:12px 0}.row.user{justify-content:flex-end}
+.bubble{max-width:90%;padding:12px 16px;border-radius:20px;line-height:1.6;overflow-wrap:anywhere}
+.user .bubble{background:var(--bubble-user);color:var(--bubble-user-text);border-bottom-right-radius:6px;white-space:pre-wrap}
+.bot .bubble{background:var(--bubble-bot);border-bottom-left-radius:6px}
+.bubble p{margin:0 0 .7em}.bubble p:last-child{margin:0}
+.bubble h3,.bubble h4,.bubble h5,.bubble h6{margin:.9em 0 .4em}
+.bubble ul,.bubble ol{margin:.4em 0 .8em;padding-left:1.4em}
+.bubble code{background:var(--code);padding:1px 5px;border-radius:4px;font-size:13px}
+.bubble pre{background:var(--code);padding:12px;border-radius:10px;overflow:auto}
+.bubble pre code{padding:0;background:none}
+.tw{overflow:auto;margin:.5em 0}
+table{border-collapse:collapse;font-size:13px;width:100%}
+th,td{border:1px solid var(--border);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:var(--code)}
+.typing{color:var(--muted);font-style:italic}
+
+/* welcome screen */
+.empty{flex:1;display:flex;flex-direction:column}
+.hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px 0}
+.mark{width:84px;height:84px;border-radius:26px;background:linear-gradient(145deg,#6A96FF,#2F5BEA);display:grid;place-items:center;box-shadow:0 14px 34px rgba(47,91,234,.35)}
+.mark svg{width:44px;height:44px}
+.hero h2{font-size:34px;font-weight:600;letter-spacing:-.02em;margin:30px 0 8px}
+.hero p{color:var(--muted);margin:0}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+.card{text-align:left;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:28px;padding:16px 22px;cursor:pointer;font:inherit;transition:.15s}
+.card:hover{border-color:var(--brand);box-shadow:var(--shadow)}
+.card b{display:block;font-weight:500;font-size:15px}
+.card span{display:block;color:var(--muted);font-size:15px;margin-top:2px}
+
+/* composer */
+.composer{padding:0 24px 6px}
+.box{max-width:860px;margin:0 auto;display:flex;gap:10px;align-items:flex-end;border:1.5px solid var(--composer-border);background:var(--bg);border-radius:28px;padding:10px 10px 10px 22px;transition:.15s}
+.box:focus-within{border-color:var(--brand);box-shadow:0 0 0 4px var(--ring)}
+textarea{flex:1;resize:none;border:0;background:transparent;color:var(--text);font:inherit;font-size:16px;line-height:1.5;padding:8px 0;max-height:160px;outline:none}
+.stop{border:0;border-radius:22px;padding:0 16px;height:42px;background:#b42318;color:#fff;cursor:pointer}.stop[hidden]{display:none}.edit-prompt{display:block;margin-top:8px;padding:3px 8px;border:1px solid currentColor;border-radius:12px;background:transparent;color:inherit;cursor:pointer;font-size:12px}.send{width:44px;height:44px;flex:none;border-radius:50%;border:0;background:var(--brand);color:#fff;cursor:pointer;display:grid;place-items:center}
+.send:hover{background:var(--brand-dark)} .send:disabled{opacity:.5;cursor:not-allowed}
+.foot{text-align:center;color:var(--muted);font-size:12px;padding:6px 24px 14px}
+
+@media(max-width:700px){.cards{grid-template-columns:1fr}.hero h2{font-size:26px}}
+
+.bubble{position:relative;padding-bottom:38px}
+.message-content{overflow-wrap:anywhere}
+.msg-actions{position:absolute;right:7px;bottom:5px;display:flex;gap:4px}
+.msg-action{width:30px;height:28px;display:grid;place-items:center;border:0;border-radius:7px;background:transparent;color:var(--muted);cursor:pointer}
+.msg-action:hover,.msg-action:focus-visible{background:var(--border);color:var(--text);outline:none}
+.msg-action svg{width:16px;height:16px}
+@media(hover:hover){.msg-actions{opacity:0;transition:opacity .15s}.bubble:hover .msg-actions,.bubble:focus-within .msg-actions{opacity:1}}
+@media(hover:none){.msg-actions{opacity:1}}
+.send.busy{background:#b42318}
+.send.busy:hover{background:#912018}
+
+.edited-note{margin-top:7px;color:var(--muted);font-size:11px;font-style:italic}
+.msg-actions[hidden]{display:none!important}
+
+.prompt-edit-actions{position:absolute;right:7px;bottom:5px;display:flex;gap:4px;margin:0}
+.prompt-edit-actions button,
+.prompt-edit-actions button:last-child{width:30px;height:28px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.prompt-edit-actions button:hover,
+.prompt-edit-actions button:focus-visible{background:var(--border);color:var(--text);outline:none}
+.prompt-edit-actions button svg{width:16px;height:16px}
+
+
+@media(max-width:700px){
+  header{padding:10px 12px;gap:6px}
+  .icons{gap:0}
+  .ibtn{width:34px;height:34px}
+  .logo{font-size:16px;gap:6px}
+  .logo svg{width:22px;height:22px}
+  #title{font-size:12px}
+}
+
+</style>
+</head>
+<body>
+<div class="scrim" onclick="closeHist()"></div>
+<aside>
+  <div class="ahead"><span>History</span><button class="ibtn" onclick="closeHist()" title="Close">✕</button></div>
+  <div class="hist" id="hist"></div>
+  <div class="note">Chats are deleted automatically after 7 days.</div>
+</aside>
+<main>
+  <header>
+    <div class="icons">
+      <button class="ibtn" onclick="toggleHist()" title="History"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+      <button class="ibtn" onclick="newChat()" title="New chat"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button class="ibtn" id="tbtn" onclick="toggleTheme()" title="Toggle dark mode">🌙</button>
+    </div>
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 9.5C8 19.2 5 15.5 5 11V6l7-3z"/></svg>
+      SOC Assistant
+    </div>
+    <div id="title"></div>
+  </header>
+  <div id="msgs"><div class="wrap" id="thread"></div></div>
+  <div class="composer"><div class="box">
+    <textarea id="inp" rows="1" placeholder="Ask about alerts, agents, vulnerabilities, or an IP…"></textarea>
+    <button class="send" id="send" onclick="sendOrStop()" title="Send" aria-label="Send">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+    </button>
+  </div></div>
+  <div class="foot">AI answers can be wrong. Verify important findings in the Wazuh dashboard before acting.</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let chatId=null, busy=false, activeRequestId=null;
+const SUGGEST=[
+ {a:"Summarize the last hour",b:"of activity on my network",q:"What's happened on my network in the last hour?"},
+ {a:"Show agent status",b:"for all Wazuh agents",q:"Show the status of all Wazuh agents"},
+ {a:"Check for SSH brute force",b:"in the last 15 minutes",q:"Any SSH brute-force activity in the last 15 minutes?"},
+ {a:"Review file integrity changes",b:"from the last 5 minutes",q:"What file integrity changes were detected in the last 5 minutes?"}
+];
+const MARK='<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 9.5C8 19.2 5 15.5 5 11V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>';
+
+/* ---------- theme ---------- */
+function setTheme(t){document.documentElement.dataset.theme=t;localStorage.theme=t;$('tbtn').textContent=t==='dark'?'☀️':'🌙'}
+function toggleTheme(){setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark')}
+setTheme(localStorage.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
+
+/* ---------- history drawer ---------- */
+function toggleHist(){document.body.classList.toggle('hist-open');if(document.body.classList.contains('hist-open'))loadChats()}
+function closeHist(){document.body.classList.remove('hist-open')}
+
+/* ---------- tiny safe markdown renderer ---------- */
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function inline(s){s=esc(s);s=s.replace(/`([^`]+)`/g,'<code>$1</code>');s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');s=s.replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<em>$2</em>');return s}
+function md(src){
+  const L=src.replace(/\r/g,'').split('\n');let out=[],i=0,m;
+  const isTbl=x=>/^\s*\|.*\|\s*$/.test(x), ul=/^\s*[-*]\s+/, ol=/^\s*\d+\.\s+/;
+  while(i<L.length){
+    const l=L[i];
+    if(/^```/.test(l)){let b=[];i++;while(i<L.length&&!/^```/.test(L[i])){b.push(L[i]);i++}i++;out.push('<pre><code>'+esc(b.join('\n'))+'</code></pre>');continue}
+    if(isTbl(l)&&i+1<L.length&&/^\s*\|?\s*:?-{2,}/.test(L[i+1])){
+      const row=r=>r.trim().replace(/^\||\|$/g,'').split('|').map(c=>c.trim());
+      const head=row(l);i+=2;const body=[];while(i<L.length&&isTbl(L[i])){body.push(row(L[i]));i++}
+      out.push('<div class="tw"><table><thead><tr>'+head.map(h=>'<th>'+inline(h)+'</th>').join('')+'</tr></thead><tbody>'+body.map(r=>'<tr>'+r.map(c=>'<td>'+inline(c)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>');continue}
+    if(m=l.match(/^(#{1,4})\s+(.*)/)){const n=Math.min(m[1].length+2,6);out.push(`<h${n}>${inline(m[2])}</h${n}>`);i++;continue}
+    if(ul.test(l)){const it=[];while(i<L.length&&ul.test(L[i])){it.push(L[i].replace(ul,''));i++}out.push('<ul>'+it.map(x=>'<li>'+inline(x)+'</li>').join('')+'</ul>');continue}
+    if(ol.test(l)){const it=[];while(i<L.length&&ol.test(L[i])){it.push(L[i].replace(ol,''));i++}out.push('<ol>'+it.map(x=>'<li>'+inline(x)+'</li>').join('')+'</ol>');continue}
+    if(/^\s*$/.test(l)){i++;continue}
+    const p=[];while(i<L.length&&!/^\s*$/.test(L[i])&&!/^(```|#{1,4}\s|\s*[-*]\s|\s*\d+\.\s|\s*\|)/.test(L[i])){p.push(L[i]);i++}
+    if(!p.length){p.push(L[i]);i++}
+    out.push('<p>'+p.map(inline).join('<br>')+'</p>');
+  }
+  return out.join('');
+}
+
+/* ---------- UI ---------- */
+function bubble(role,text,messageId=null,edited=false){
+  const r=document.createElement('div');r.className='row '+(role==='user'?'user':'bot');
+  const b=document.createElement('div');b.className='bubble';
+  const content=document.createElement('div');content.className='message-content';
+  if(role==='user')content.textContent=text;else content.innerHTML=md(text);
+  if(role==='user'&&edited){
+    const note=document.createElement('div');note.className='edited-note';
+    note.textContent='Edited';content.appendChild(note);
+  }
+  b.appendChild(content);
+
+  const actions=document.createElement('div');actions.className='msg-actions';
+  const iconButton=(title,svg,handler)=>{
+    const btn=document.createElement('button');
+    btn.className='msg-action';btn.type='button';btn.title=title;
+    btn.setAttribute('aria-label',title);btn.innerHTML=svg;btn.onclick=handler;
+    actions.appendChild(btn);return btn;
+  };
+  const pencil='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>';
+  const copy='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>';
+
+  if(role==='user'&&messageId!==null){
+    iconButton('Edit prompt',pencil,()=>{
+      if(content.querySelector('.prompt-editor'))return;
+      actions.hidden=true;content.replaceChildren();
+      const editor=document.createElement('div');
+      const area=document.createElement('textarea');
+      area.className='prompt-editor';area.value=text;
+      area.setAttribute('aria-label','Edit prompt');
+      const hint=document.createElement('div');
+      hint.className='edit-hint';
+      hint.textContent='Rerun replaces this prompt and later turns.';
+      const controls=document.createElement('div');
+      controls.className='prompt-edit-actions';
+      const cancel=document.createElement('button');
+      cancel.type='button';cancel.title='Cancel editing';
+      cancel.setAttribute('aria-label','Cancel editing');
+      cancel.innerHTML='<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+      cancel.onclick=()=>{content.textContent=text;actions.hidden=false};
+      const rerun=document.createElement('button');
+      rerun.type='button';rerun.title='Save edited prompt and rerun';
+      rerun.setAttribute('aria-label','Save edited prompt and rerun');
+      rerun.innerHTML='<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>';
+      rerun.onclick=()=>{
+        const revised=area.value.trim();
+        if(!revised){area.focus();return}
+        content.textContent=text;actions.hidden=false;
+        const responseBubble=r.nextElementSibling
+          ?r.nextElementSibling.querySelector('.bubble'):null;
+        editAndRun(messageId,revised,responseBubble);
+      };
+      controls.append(cancel,rerun);editor.append(area,hint,controls);
+      content.appendChild(editor);area.focus();
+    });
+  }
+  iconButton('Copy message',copy,async e=>{
+    const btn=e.currentTarget;
+    try{
+      const value=role==='user'?text:(content.innerText||content.textContent||'');
+      await navigator.clipboard.writeText(value);
+      btn.title='Copied';btn.setAttribute('aria-label','Copied');
+      setTimeout(()=>{btn.title='Copy message';btn.setAttribute('aria-label','Copy message')},1200);
+    }catch(err){btn.title='Copy failed'}
+  });
+  b.appendChild(actions);r.appendChild(b);$('thread').appendChild(r);
+  $('msgs').scrollTop=$('msgs').scrollHeight;return b;
+}
+function showEmpty(){
+  const welcomeOptions=[
+    {title:'How can I help with triage today?',body:'I can answer questions about your environment and help explain findings. I can’t change settings or take actions.'},
+    {title:'What would you like to investigate?',body:'Ask about your Wazuh environment, alerts, or findings. I can provide answers, but I can’t make changes.'},
+    {title:'What can I help you understand?',body:'I can help interpret information from your environment. I can’t modify systems or perform actions.'},
+    {title:'What would you like to look into?',body:'Ask a question about your environment or its alerts. I can explain what I find, but I can’t change anything.'}
+  ];
+  const welcome=welcomeOptions[Math.floor(Math.random()*welcomeOptions.length)];
+  $('thread').innerHTML='<div class="empty"><div class="hero"><div class="mark">'+MARK+'</div><h2>'+esc(welcome.title)+'</h2><p>'+esc(welcome.body)+'</p></div><div class="cards">'+
+  SUGGEST.map((s,i)=>`<button class="card" onclick="ask(SUGGEST[${i}].q)"><b>${esc(s.a)}</b><span>${esc(s.b)}</span></button>`).join('')+'</div></div>';
+}
+function ask(t){$('inp').value=t;send()}
+function newChat(){closeHist();chatId=null;$('title').textContent='';showEmpty();loadChats();$('inp').focus()}
+
+async function loadChats(){
+  const chats=await (await fetch('/api/chats')).json();
+  const groups={Today:[],Yesterday:[],'Previous 7 days':[]};
+  const now=new Date(),start=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime()/1000;
+  chats.forEach(c=>{(c.updated>=start?groups.Today:c.updated>=start-86400?groups.Yesterday:groups['Previous 7 days']).push(c)});
+  const h=$('hist');h.innerHTML='';
+  for(const [g,list] of Object.entries(groups)){
+    if(!list.length)continue;
+    h.insertAdjacentHTML('beforeend','<h4>'+g+'</h4>');
+    list.forEach(c=>{
+      const d=document.createElement('div');d.className='item'+(c.id===chatId?' active':'');
+      d.innerHTML='<div class="item-meta"><span class="item-title"></span><time class="item-time"></time></div><button title="Delete">✕</button>';
+      d.querySelector('.item-title').textContent=c.title;
+      const updated=new Date(Number(c.updated)*1000);
+      const time=d.querySelector('.item-time');
+      if(Number.isFinite(updated.getTime())){
+        time.dateTime=updated.toISOString();
+        time.textContent=updated.toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+      }
+      d.onclick=()=>openChat(c.id,c.title);
+      d.querySelector('button').onclick=async e=>{e.stopPropagation();await fetch('/api/chats/'+c.id,{method:'DELETE'});if(c.id===chatId)newChat();else loadChats()};
+      h.appendChild(d);
+    });
+  }
+}
+async function openChat(id,title){
+  closeHist();
+  chatId=id;$('title').textContent=title;$('thread').innerHTML='';
+  const msgs=await (await fetch('/api/chats/'+id)).json();
+  msgs.forEach(m=>bubble(m.role,m.content,m.id,m.edited));loadChats();
+}
+function setSendButton(busy,stopping=false){
+  const btn=$('send');
+  btn.classList.toggle('busy',busy);
+  btn.title=busy?(stopping?'Stopping…':'Stop'):'Send';
+  btn.setAttribute('aria-label',btn.title);
+  btn.disabled=stopping;
+  btn.innerHTML=busy
+    ? '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>'
+    : '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
+}
+async function editAndRun(messageId,revised,responseBubble){
+  if(busy||!chatId)return;
+  busy=true;activeRequestId=crypto.randomUUID();setSendButton(true);
+
+  // Keep the response in its existing bubble while the edited prompt reruns.
+  const wait=responseBubble||bubble('bot','');
+  const content=wait.querySelector('.message-content');
+  const previousContent=content.innerHTML;
+  content.classList.add('typing');
+  let seconds=0;content.textContent='Updating response… 0s';
+  const timer=setInterval(()=>{seconds++;content.textContent='Updating response… '+seconds+'s'},1000);
+
+  const currentChat=chatId,title=$('title').textContent;
+  try{
+    const r=await fetch('/api/chats/'+encodeURIComponent(currentChat)+'/messages/'+messageId+'/edit',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({message:revised,request_id:activeRequestId})
+    });
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.error||'Could not edit prompt');
+    await openChat(d.chat_id,title);
+  }catch(e){
+    content.classList.remove('typing');
+    content.innerHTML=previousContent;
+    console.error('Edited prompt rerun failed:',e);
+  }
+  clearInterval(timer);busy=false;activeRequestId=null;setSendButton(false);
+  loadChats();$('inp').focus();
+}
+function sendOrStop(){if(busy)stopSearch();else send()}
+async function stopSearch(){
+  if(!activeRequestId)return;
+  setSendButton(true,true);
+  try{await fetch('/api/stop/'+activeRequestId,{method:'POST'})}catch(e){}
+}
+async function send(){
+  const t=$('inp').value.trim();if(!t||busy)return;
+  busy=true;$('send').disabled=false;
+  $('inp').value='';$('inp').style.height='auto';
+  activeRequestId=crypto.randomUUID();setSendButton(true);
+  if(!chatId&&$('thread').querySelector('.empty'))$('thread').innerHTML='';
+  bubble('user',t);
+  const wait=bubble('bot','');
+  const content=wait.querySelector('.message-content');
+  content.classList.add('typing');
+  let s=0;content.textContent='Querying Wazuh… 0s';
+  const timer=setInterval(()=>{s++;content.textContent='Querying Wazuh… '+s+'s'},1000);
+  try{
+    const r=await fetch('/api/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({chat_id:chatId,message:t,request_id:activeRequestId})
+    });
+    const d=await r.json();
+    content.classList.remove('typing');
+    content.innerHTML=md(d.answer||d.error||'No response');
+    if(!chatId){chatId=d.chat_id;$('title').textContent=t.slice(0,60)}
+    await openChat(chatId,$('title').textContent);
+  }catch(e){
+    content.classList.remove('typing');
+    content.textContent='⚠️ Could not reach the server.';
+  }
+  clearInterval(timer);busy=false;activeRequestId=null;setSendButton(false);
+  loadChats();$('inp').focus();$('msgs').scrollTop=$('msgs').scrollHeight;
+}
+$('inp').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
+$('inp').addEventListener('input',e=>{e.target.style.height='auto';e.target.style.height=e.target.scrollHeight+'px'});
+showEmpty();loadChats();
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "repository": "https://github.com/gensecaihq/Wazuh-MCP-Server.git",
+  "commit": "960133dc8cd1cc909c6d79bc3bcaeeee583758e2",
+  "transport": "stdio",
+  "shodan_package": "@burtthecoder/mcp-shodan@1.0.34"
+}

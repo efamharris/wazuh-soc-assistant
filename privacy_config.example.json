@@ -1,0 +1,7 @@
+{
+  "own_public_ranges": [],
+  "sensitive_terms": [],
+  "full_log": "smart",
+  "max_field_chars": 1500,
+  "keep_values": ["root", "system", "local service", "network service", "-", "unknown"]
+}

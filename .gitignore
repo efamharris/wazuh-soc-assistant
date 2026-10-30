@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Runtime data (contains conversations, pseudonym mappings, or tool metadata)
+history.db*
+pseudo.db*
+audit.log*
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.log
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+privacy_config.json
+.claude/
+*.pem
+*.key
+
+# Editors and OS files
+.DS_Store
+.idea/
+.vscode/
