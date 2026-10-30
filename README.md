@@ -105,6 +105,10 @@ The app creates `history.db`, `pseudo.db`, and `audit.log` beside the applicatio
 - `test_privacy.py`: the privacy-layer self-check supplied with the build.
 - `deploy/`: service-unit example matching the current build-guide update.
 
+## License
+
+This project is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE). Third-party components are governed by their respective licenses.
+
 ## Updating the build
 
 Keep the tracked tree limited to files that are in active use. Put machine-local state, credentials, chat databases, logs, virtual environments, and generated assets outside commits.
