@@ -2,7 +2,7 @@
 
 A single-user proof of concept for asking SOC triage questions in a local browser UI. The Flask app runs Claude Code headlessly and connects to Wazuh and Shodan through local stdio MCP servers. A local privacy layer masks internal identifiers, scrubs Wazuh results, blocks private or placeholder lookups to Shodan, and restores masked values in the analyst-facing answer.
 
-This repository contains the current application and its required privacy components. It does not include the community Wazuh MCP server source, a Wazuh deployment, API credentials, or machine-wide Claude Code policy files.
+This repository contains the current application and its required privacy components. It does not include the source for the community-maintained [Wazuh MCP Server](https://github.com/gensecaihq/Wazuh-MCP-Server). This build pins that upstream dependency to [commit `960133dc8cd1cc909c6d79bc3bcaeeee583758e2`](https://github.com/gensecaihq/Wazuh-MCP-Server/commit/960133dc8cd1cc909c6d79bc3bcaeeee583758e2), recorded in `integrations/wazuh-mcp-server.lock`; the upstream project retains its own license. The repository also excludes a Wazuh deployment, API credentials, and machine-wide Claude Code policy files.
 
 ## Scope
 
@@ -45,7 +45,7 @@ Treat answers as triage assistance and verify findings in Wazuh. This is a demo 
 
    Add your public IP ranges and sensitive organisation terms. Keep the local file private; it is excluded from Git.
 
-3. Install the pinned Wazuh MCP server and configure its local environment:
+3. Install the pinned [Wazuh MCP Server](https://github.com/gensecaihq/Wazuh-MCP-Server) and configure its local environment:
 
    ```bash
    git clone https://github.com/gensecaihq/Wazuh-MCP-Server.git
