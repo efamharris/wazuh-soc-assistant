@@ -17,7 +17,7 @@ These are baseline requirements for one analyst using the app locally. The Wazuh
 | Network | Internet access for Claude and package downloads, plus network access from this machine to the Wazuh Manager and Indexer. |
 | Browser | A modern browser on the same machine to open the local UI. |
 
-The app, local bridge, and source-installed Wazuh MCP server need Python 3.11 or newer. This setup also needs the current Node.js LTS release with npm/npx, Git, and the latest Claude Code CLI authenticated to an account that can use Claude. Docker is optional; this guide runs the Wazuh MCP server from source. You also need a Wazuh deployment with read-only Manager API and Indexer accounts, and a Shodan API key. The Wazuh MCP Server 5.0 line supports Wazuh 4.8 through 4.14.7. See [Anthropic's Claude Code system requirements](https://docs.anthropic.com/en/docs/claude-code/getting-started) for its documented OS, memory, software, and network requirements.
+The app, local bridge, and source-installed Wazuh MCP server need Python 3.11 or newer. This setup also needs the current Node.js LTS release with npm/npx, Git, and the latest Claude Code CLI authenticated to an account that can use Claude. You also need a Wazuh deployment with read-only Manager API and Indexer accounts, and a Shodan API key. The Wazuh MCP Server 5.0 line supports Wazuh 4.8 through 4.14.7. See [Anthropic's Claude Code system requirements](https://docs.anthropic.com/en/docs/claude-code/getting-started) for its documented OS, memory, software, and network requirements.
 
 ## Before you start
 
@@ -88,8 +88,6 @@ claude --version
 
 If a command is missing, or Node.js is not on an LTS release, resolve that before continuing.
 
-Docker is optional. The steps below run the Wazuh MCP server from its source checkout, so you do not need to install Docker or Compose for this test. The upstream also documents Docker Compose as an alternative deployment method.
-
 ### Version and update policy
 
 Python, Git, Node.js LTS, and Claude Code are installed from current supported releases. This build currently pins Wazuh MCP Server `5.0.0`, Shodan MCP `1.0.37`, and the MCP Python SDK `2.3.0` in [`integrations/wazuh-mcp-server.lock`](integrations/wazuh-mcp-server.lock) and `requirements.txt`. These pins make installs repeatable. When upstream releases change, review the release notes and compatibility requirements, update the related pins/configuration together, and run the end-to-end verification in this guide before using the update. Do not replace pins with floating `main` or `@latest` tags in a working deployment.
@@ -141,7 +139,7 @@ Replace the empty `own_public_ranges` array with your organization's public netw
 
 ## 3. Install the pinned Wazuh MCP release from source
 
-This build uses the community [Wazuh MCP Server](https://github.com/gensecaihq/Wazuh-MCP-Server) release `5.0.0`, pinned in [`integrations/wazuh-mcp-server.lock`](integrations/wazuh-mcp-server.lock). The server exposes Streamable HTTP. The local [`wazuh_http_bridge.py`](wazuh_http_bridge.py) connects to it, detokenizes Wazuh queries, and scrubs returned data before Claude receives it. This section runs the server from source without Docker.
+This build uses the community [Wazuh MCP Server](https://github.com/gensecaihq/Wazuh-MCP-Server) release `5.0.0`, pinned in [`integrations/wazuh-mcp-server.lock`](integrations/wazuh-mcp-server.lock). The server exposes Streamable HTTP. The local [`wazuh_http_bridge.py`](wazuh_http_bridge.py) connects to it, detokenizes Wazuh queries, and scrubs returned data before Claude receives it.
 
 Clone the exact pinned Wazuh MCP release, create its own virtual environment, and install its Python package:
 
@@ -258,7 +256,7 @@ The Shodan key is supplied at the hidden prompt; it should not appear in the com
 claude mcp list
 ```
 
-Confirm that both `wazuh` and `shodan` appear and are connected before starting the web app. The local Wazuh container must be running whenever you use the assistant. If you later move the assistant checkout, remove and re-add its MCP entries because their commands contain absolute paths.
+Confirm that both `wazuh` and `shodan` appear and are connected before starting the web app. The local Wazuh MCP server process must be running whenever you use the assistant. If you later move the assistant checkout, remove and re-add its MCP entries because their commands contain absolute paths.
 
 ## 7. Start the assistant
 
