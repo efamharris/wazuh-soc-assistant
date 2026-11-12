@@ -13,11 +13,11 @@ These are baseline requirements for one analyst using the app locally. The Wazuh
 | Operating system | 64-bit Ubuntu 24.04 or newer; commands below assume Bash. |
 | CPU | 2 cores. This is a practical baseline for the Flask app and local MCP processes, not a benchmarked project limit. |
 | Memory | 4 GB RAM. Claude Code documents 4 GB+ as its hardware minimum. |
-| Free disk space | 8 GB for the checkout, Python virtual environment, Docker image, Node package cache, and logs. This is a practical allowance, not a measured minimum. |
+| Free disk space | 8 GB for the checkouts, Python virtual environments, Node package cache, and logs. This is a practical allowance, not a measured minimum. |
 | Network | Internet access for Claude and package downloads, plus network access from this machine to the Wazuh Manager and Indexer. |
 | Browser | A modern browser on the same machine to open the local UI. |
 
-The app and local bridge need Python 3.11 or newer. This setup also needs Docker Engine with Compose v2, the current Node.js LTS release with npm/npx, Git, and the latest Claude Code CLI authenticated to an account that can use Claude. You also need a Wazuh deployment with read-only Manager API and Indexer accounts, and a Shodan API key. The Wazuh MCP Server 5.0 line supports Wazuh 4.8 through 4.14.7. See [Anthropic's Claude Code system requirements](https://docs.anthropic.com/en/docs/claude-code/getting-started) for its documented OS, memory, software, and network requirements.
+The app, local bridge, and source-installed Wazuh MCP server need Python 3.11 or newer. This setup also needs the current Node.js LTS release with npm/npx, Git, and the latest Claude Code CLI authenticated to an account that can use Claude. Docker is optional; this guide runs the Wazuh MCP server from source. You also need a Wazuh deployment with read-only Manager API and Indexer accounts, and a Shodan API key. The Wazuh MCP Server 5.0 line supports Wazuh 4.8 through 4.14.7. See [Anthropic's Claude Code system requirements](https://docs.anthropic.com/en/docs/claude-code/getting-started) for its documented OS, memory, software, and network requirements.
 
 ## Before you start
 
@@ -28,7 +28,7 @@ Run the commands in order, in the same terminal, unless a step says otherwise. B
 | `privacy_config.json` | Your organization's public IP ranges and sensitive names/terms. |
 | Wazuh MCP `.env` | Reachable Wazuh Manager and Indexer addresses, read-only credentials, and TLS settings that match your certificates. |
 | Wazuh MCP API key | Generated read-only key; the local bridge uses it to obtain a short-lived bearer token. |
-| Docker | Docker Engine and Compose v2 to run the current Wazuh MCP server image. |
+| Wazuh MCP source checkout | The pinned Wazuh MCP Server release, installed in its own Python virtual environment and configured with your Wazuh endpoints. |
 | Shodan prompt | Your Shodan API key. |
 | Anthropic prompt | Your Anthropic API key, unless Claude Code is already authenticated on this machine. |
 | Path variables in Step 1 | Change them only if you choose a different directory from the defaults. |
@@ -88,19 +88,11 @@ claude --version
 
 If a command is missing, or Node.js is not on an LTS release, resolve that before continuing.
 
-Install Docker Engine and the Compose plugin using [Docker's official Ubuntu instructions](https://docs.docker.com/engine/install/ubuntu/). Then verify the installation:
-
-```bash
-docker --version
-docker compose version
-sudo docker run hello-world
-```
-
-Use `sudo` for the Docker Compose commands below if your account is not configured to access the Docker daemon.
+Docker is optional. The steps below run the Wazuh MCP server from its source checkout, so you do not need to install Docker or Compose for this test. The upstream also documents Docker Compose as an alternative deployment method.
 
 ### Version and update policy
 
-Python, Git, Node.js LTS, Claude Code, and Docker are installed from current supported releases. This build currently pins Wazuh MCP Server `5.0.0`, Shodan MCP `1.0.37`, and the MCP Python SDK `2.3.0` in [`integrations/wazuh-mcp-server.lock`](integrations/wazuh-mcp-server.lock) and `requirements.txt`. These pins make installs repeatable. When upstream releases change, review the release notes and compatibility requirements, update the related pins/configuration together, and run the end-to-end verification in this guide before using the update. Do not replace pins with floating `main` or `@latest` tags in a working deployment.
+Python, Git, Node.js LTS, and Claude Code are installed from current supported releases. This build currently pins Wazuh MCP Server `5.0.0`, Shodan MCP `1.0.37`, and the MCP Python SDK `2.3.0` in [`integrations/wazuh-mcp-server.lock`](integrations/wazuh-mcp-server.lock) and `requirements.txt`. These pins make installs repeatable. When upstream releases change, review the release notes and compatibility requirements, update the related pins/configuration together, and run the end-to-end verification in this guide before using the update. Do not replace pins with floating `main` or `@latest` tags in a working deployment.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for a concise record of project changes and verification status.
 
@@ -147,17 +139,21 @@ nano "$ASSISTANT_DIR/privacy_config.json"
 
 Replace the empty `own_public_ranges` array with your organization's public network ranges in CIDR notation (for example, `198.51.100.10/32` is a documentation-only example), and replace the empty `sensitive_terms` array with names or terms that should be masked. Keep the JSON syntax: values go in double quotes, separated by commas. The example is valid but has no organization-specific entries; leaving the arrays empty means those custom ranges or terms are not configured. Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X` in nano). Do not commit `privacy_config.json`.
 
-## 3. Install the latest Wazuh MCP release
+## 3. Install the pinned Wazuh MCP release from source
 
-This build uses the community [Wazuh MCP Server](https://github.com/gensecaihq/Wazuh-MCP-Server) release `5.0.0`, pinned in [`integrations/wazuh-mcp-server.lock`](integrations/wazuh-mcp-server.lock). The server runs in Docker and exposes Streamable HTTP. The local [`wazuh_http_bridge.py`](wazuh_http_bridge.py) connects to it, detokenizes Wazuh queries, and scrubs returned data before Claude receives it.
+This build uses the community [Wazuh MCP Server](https://github.com/gensecaihq/Wazuh-MCP-Server) release `5.0.0`, pinned in [`integrations/wazuh-mcp-server.lock`](integrations/wazuh-mcp-server.lock). The server exposes Streamable HTTP. The local [`wazuh_http_bridge.py`](wazuh_http_bridge.py) connects to it, detokenizes Wazuh queries, and scrubs returned data before Claude receives it. This section runs the server from source without Docker.
 
-Install Docker Engine with Compose v2 first, as described above. Then clone the exact pinned Wazuh MCP release:
+Clone the exact pinned Wazuh MCP release, create its own virtual environment, and install its Python package:
 
 ```bash
 cd "$HOME"
 git clone --branch 5.0.0 --depth 1 https://github.com/gensecaihq/Wazuh-MCP-Server.git "$WAZUH_MCP_DIR"
 cd "$WAZUH_MCP_DIR"
 git describe --tags --exact-match HEAD
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
 cp "$ASSISTANT_DIR/integrations/wazuh-mcp-server.env.example" .env
 chmod 600 .env
 ```
@@ -168,7 +164,7 @@ Edit the environment file:
 nano "$WAZUH_MCP_DIR/.env"
 ```
 
-Replace `WAZUH_HOST`, `WAZUH_USER`, and `WAZUH_PASS` with the reachable Manager address and a dedicated read-only API account. Replace `WAZUH_INDEXER_HOST`, `WAZUH_INDEXER_USER`, and `WAZUH_INDEXER_PASS` with the Indexer address and a dedicated read-only account. Change ports only if your Wazuh services use non-default ports. The example uses strict TLS verification; if your certificates are private, set `WAZUH_CA_BUNDLE` to a CA bundle path mounted into the container according to the upstream configuration guide. For a stock self-signed Manager certificate, set `WAZUH_ALLOW_SELF_SIGNED=true`; set `WAZUH_INDEXER_VERIFY_SSL=false` only if you deliberately accept the Indexer's certificate without verification. Do not leave angle-bracket placeholders. Save and exit nano.
+Replace `WAZUH_HOST`, `WAZUH_USER`, and `WAZUH_PASS` with the reachable Manager address and a dedicated read-only API account. Replace `WAZUH_INDEXER_HOST`, `WAZUH_INDEXER_USER`, and `WAZUH_INDEXER_PASS` with the Indexer address and a dedicated read-only account. Change ports only if your Wazuh services use non-default ports. The example uses strict TLS verification; if your certificates are private, set `WAZUH_CA_BUNDLE` to the CA bundle's path on this VM. For a stock self-signed Manager certificate, set `WAZUH_ALLOW_SELF_SIGNED=true`; set `WAZUH_INDEXER_VERIFY_SSL=false` only if you deliberately accept the Indexer's certificate without verification. Do not leave angle-bracket placeholders. Save and exit nano.
 
 Generate the production signing secret and the read-only MCP API key directly into `.env` without printing them to the terminal:
 
@@ -188,15 +184,26 @@ PY
 chmod 600 .env
 ```
 
-Start the server and wait for its health check to report readiness:
+Start the Wazuh MCP server in this terminal. Keep it running while testing the assistant; use a second SSH terminal for the remaining steps:
 
 ```bash
-sudo docker compose up -d
-sudo docker compose ps
+cd "$WAZUH_MCP_DIR"
+source .venv/bin/activate
+set -a
+. ./.env
+set +a
+MCP_HOST=127.0.0.1 MCP_PORT=3000 ENVIRONMENT=production python -m wazuh_mcp_server
+```
+
+In the second SSH terminal, define the paths again and check readiness:
+
+```bash
+export ASSISTANT_DIR="$HOME/wazuh-soc-assistant"
+export WAZUH_MCP_DIR="$HOME/Wazuh-MCP-Server-5.0.0"
 curl -fsS http://127.0.0.1:3000/ready
 ```
 
-The default Compose setup binds the MCP server to loopback port `3000`; leave it local. If `/ready` fails, inspect `sudo docker compose logs --tail=100` and correct the Wazuh host, credentials, or TLS settings before continuing.
+The server listens on loopback port `3000`; leave it local. If `/ready` fails, inspect the server output in the first terminal and correct the Wazuh host, credentials, TLS settings, or network access before continuing.
 
 The MCP server permits read-only tools through the `wazuh:read` key scope and exposes only the `alerts`, `agents`, `vulnerabilities`, `analysis`, `compliance`, and `system` toolsets. The `response` and `web_search` toolsets are not enabled.
 

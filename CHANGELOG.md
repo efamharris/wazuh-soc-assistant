@@ -12,6 +12,7 @@ Notable changes to this project are recorded here so they are easy to review bet
 - Pinned the local bridge dependencies to MCP Python SDK `2.3.0` and `httpx2` `2.16.0`.
 - Pinned the Shodan MCP command to `@burtthecoder/mcp-shodan` `1.0.37` and kept its local privacy proxy focused on Shodan requests.
 - Reworked the README setup steps for the selected versions, including cloning the tagged Wazuh release and registering both MCP servers with Claude Code.
+- Clarified that Docker is optional and documented a native source install for the Wazuh MCP server, avoiding a container requirement for the fresh-machine test.
 
 ### Verification
 
