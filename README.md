@@ -25,7 +25,7 @@ Run the commands in order, in the same terminal, unless a step says otherwise. B
 
 | File or prompt | What you must supply |
 | --- | --- |
-| `privacy_config.json` | Your organization's public IP ranges and sensitive names/terms. |
+| `privacy_config.json` | Optional. You can leave the built-in privacy defaults in place and add organization-specific ranges or terms later. |
 | Wazuh MCP `.env` | Reachable Wazuh Manager and Indexer addresses, read-only credentials, and TLS settings that match your certificates. |
 | Wazuh MCP API key | Generated read-only key; the local bridge uses it to obtain a short-lived bearer token. |
 | Wazuh MCP source checkout | The pinned Wazuh MCP Server release, installed in its own Python virtual environment and configured with your Wazuh endpoints. |
@@ -121,17 +121,23 @@ python3 -m venv venv
 source venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
-cp privacy_config.example.json privacy_config.json
-chmod 600 privacy_config.json
 ```
 
-Open the new file in a text editor:
+### Optional: add organization-specific privacy terms
+
+You do **not** need to create or edit `privacy_config.json` to install or start the assistant. If the file is absent, the app uses its built-in behavior: it pseudonymizes non-public IP addresses and email addresses, pseudonymizes host and username values found in recognized Wazuh fields, and redacts common secret formats and secret-valued fields. You can proceed directly to Step 3 and tailor this file later.
+
+Use this optional file to add public IP ranges that belong to your organization and names or terms specific to your organization that you want pseudonymized before prompts or Wazuh results reach Claude. These entries extend the built-in behavior; they do not replace it. Leave an array empty if you have nothing to add.
+
+If you want to configure those extra terms now, copy the example and restrict its permissions:
 
 ```bash
+cp "$ASSISTANT_DIR/privacy_config.example.json" "$ASSISTANT_DIR/privacy_config.json"
+chmod 600 "$ASSISTANT_DIR/privacy_config.json"
 nano "$ASSISTANT_DIR/privacy_config.json"
 ```
 
-Replace the empty `own_public_ranges` array with your organization's public network ranges in CIDR notation (for example, `198.51.100.10/32` is a documentation-only example), and replace the empty `sensitive_terms` array with names or terms that should be masked. Keep the JSON syntax: values go in double quotes, separated by commas. The example is valid but has no organization-specific entries; leaving the arrays empty means those custom ranges or terms are not configured. Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X` in nano). Do not commit `privacy_config.json`.
+Add only the ranges and terms you want treated as organization-specific. Enter IP ranges in CIDR notation (for example, `198.51.100.10/32` is documentation-only; replace it with a real range you own). Enter terms as JSON strings in double quotes, separated by commas. The example starts with both arrays empty, which is valid. Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X` in nano). You can edit this file later; restart the assistant and its Claude Code session after changes so they reload it. Do not commit `privacy_config.json`.
 
 ## 3. Install the pinned Wazuh MCP release from source
 

@@ -13,6 +13,7 @@ Notable changes to this project are recorded here so they are easy to review bet
 - Pinned the Shodan MCP command to `@burtthecoder/mcp-shodan` `1.0.37` and kept its local privacy proxy focused on Shodan requests.
 - Reworked the README setup steps for the selected versions, including cloning the tagged Wazuh release and registering both MCP servers with Claude Code.
 - Documented installing and running the Wazuh MCP server from source for the fresh-machine test.
+- Clarified that `privacy_config.json` is optional, described the built-in defaults, and explained how to add organization-specific terms later.
 
 ### Verification
 
