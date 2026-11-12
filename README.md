@@ -94,8 +94,6 @@ Python, Git, Node.js LTS, and Claude Code are installed from current supported r
 
 See [`CHANGELOG.md`](CHANGELOG.md) for a concise record of project changes and verification status.
 
-If this repository is still private, you must be signed in to GitHub with an account that has access before cloning it. Once it is public, the same clone command works without repository access being granted first.
-
 ## 1. Clone this repository
 
 Run these commands from your home directory. They create `~/wazuh-soc-assistant`:
@@ -105,8 +103,6 @@ cd ~
 git clone https://github.com/efamharris/wazuh-soc-assistant.git
 cd ~/wazuh-soc-assistant
 ```
-
-If GitHub asks you to authenticate, complete its browser/device sign-in or use an SSH remote configured for your GitHub account. Do not put a password or token in the clone URL.
 
 Keep this terminal open and define the paths used in the remaining commands:
 
