@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Privacy proxy for MCP servers over stdio.
-Usage: privacy_proxy.py <wazuh|shodan> <real server command> [args...]"""
+"""Privacy proxy for the Shodan MCP server over stdio.
+Usage: privacy_proxy.py shodan <real server command> [args...]"""
 import json, os, subprocess, sys, threading, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import privacy
 
-if len(sys.argv) < 3 or sys.argv[1] not in ("wazuh", "shodan"):
-    sys.exit("Usage: privacy_proxy.py <wazuh|shodan> <command> [args...]")
+if len(sys.argv) < 3 or sys.argv[1] != "shodan":
+    sys.exit("Usage: privacy_proxy.py shodan <command> [args...]")
 MODE, CMD = sys.argv[1], sys.argv[2:]
 AUDIT = os.path.join(privacy.BASE, "audit.log")
 sys.stdin.reconfigure(encoding="utf-8")
@@ -69,18 +69,13 @@ def to_child():
             params = msg.get("params") or {}
             args = params.get("arguments") or {}
             tool = params.get("name")
-            if MODE == "shodan":
-                reason = privacy.outbound_problem(args)
-                audit(tool=tool, arguments=args, decision="blocked" if reason else "allowed", reason=reason)
-                if reason:
-                    if "id" in msg:
-                        emit(error_result(msg["id"], "Blocked by privacy policy: %s. Internal and "
-                                                      "placeholder values must never be sent to Shodan." % reason))
-                    continue
-            else:
-                params["arguments"] = privacy.detokenise_obj(args)
-                msg["params"] = params
-                audit(tool=tool, decision="forwarded")
+            reason = privacy.outbound_problem(args)
+            audit(tool=tool, arguments=args, decision="blocked" if reason else "allowed", reason=reason)
+            if reason:
+                if "id" in msg:
+                    emit(error_result(msg["id"], "Blocked by privacy policy: %s. Internal and "
+                                                  "placeholder values must never be sent to Shodan." % reason))
+                continue
         try:
             child.stdin.write(json.dumps(msg, ensure_ascii=False) + "\n")
             child.stdin.flush()

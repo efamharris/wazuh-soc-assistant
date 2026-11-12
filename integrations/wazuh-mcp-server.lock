@@ -1,6 +1,8 @@
 {
   "repository": "https://github.com/gensecaihq/Wazuh-MCP-Server.git",
-  "commit": "960133dc8cd1cc909c6d79bc3bcaeeee583758e2",
-  "transport": "stdio",
-  "shodan_package": "@burtthecoder/mcp-shodan@1.0.34"
+  "release": "5.0.0",
+  "image": "ghcr.io/gensecaihq/wazuh-mcp-server:5.0.0",
+  "transport": "streamable-http",
+  "bridge": "local stdio via mcp==2.3.0",
+  "shodan_package": "@burtthecoder/mcp-shodan@1.0.37"
 }
