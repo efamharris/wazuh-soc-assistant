@@ -19,6 +19,8 @@ These are baseline requirements for one analyst using the app locally. The Wazuh
 
 The app, local bridge, and source-installed Wazuh MCP server need Python 3.11 or newer. This setup also needs the current Node.js LTS release with npm/npx, Git, and the latest Claude Code CLI authenticated to an account that can use Claude. You also need a Wazuh deployment with read-only Manager API and Indexer accounts, and a Shodan API key. The Wazuh MCP Server 5.0 line supports Wazuh 4.8 through 4.14.7. See [Anthropic's Claude Code system requirements](https://docs.anthropic.com/en/docs/claude-code/getting-started) for its documented OS, memory, software, and network requirements.
 
+Ensure the VM can reach the Wazuh Manager API on port `55000` and the Indexer on port `9200`. Configure network firewalls to allow those connections only from the assistant VM. The MCP endpoint and Flask UI stay on loopback; do not expose ports `3000` or `8080` to the network.
+
 ## Before you start
 
 Run the commands in order, in the same terminal, unless a step says otherwise. Before using the assistant, customize only the items listed here:
@@ -28,7 +30,7 @@ Run the commands in order, in the same terminal, unless a step says otherwise. B
 | `privacy_config.json` | Optional. You can leave the built-in privacy defaults in place and add organization-specific ranges or terms later. |
 | Wazuh MCP `.env` | Reachable Wazuh Manager and Indexer addresses, read-only credentials, and TLS settings that match your certificates. |
 | Wazuh MCP API key | Generated read-only key; the local bridge uses it to obtain a short-lived bearer token. |
-| Wazuh MCP source checkout | The pinned Wazuh MCP Server release, installed in its own Python virtual environment and configured with your Wazuh endpoints. |
+| Wazuh MCP source checkout | Your fork's `stable` branch, installed in its own Python virtual environment and configured with your Wazuh endpoints. |
 | Shodan prompt | Your Shodan API key. |
 | Anthropic prompt | Your Anthropic API key, unless Claude Code is already authenticated on this machine. |
 | Path variables in Step 1 | Change them only if you choose a different directory from the defaults. |
@@ -90,7 +92,7 @@ If a command is missing, or Node.js is not on an LTS release, resolve that befor
 
 ### Version and update policy
 
-Python, Git, Node.js LTS, and Claude Code are installed from current supported releases. This build currently pins Wazuh MCP Server `5.0.0`, Shodan MCP `1.0.37`, and the MCP Python SDK `2.3.0` in [`integrations/wazuh-mcp-server.lock`](integrations/wazuh-mcp-server.lock) and `requirements.txt`. These pins make installs repeatable. When upstream releases change, review the release notes and compatibility requirements, update the related pins/configuration together, and run the end-to-end verification in this guide before using the update. Do not replace pins with floating `main` or `@latest` tags in a working deployment.
+Python, Git, Node.js LTS, and Claude Code are installed from current supported releases. The Wazuh MCP integration uses the `main` branch of your fork, `efamharris/Wazuh-MCP-Server`. Your fork does not automatically receive later upstream changes; the code changes only when you choose to sync or merge them. Shodan MCP `1.0.37` and the MCP Python SDK `2.3.0` are recorded in [`integrations/wazuh-mcp-server.lock`](integrations/wazuh-mcp-server.lock) and `requirements.txt`.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for a concise record of project changes and verification status.
 
@@ -108,7 +110,7 @@ Keep this terminal open and define the paths used in the remaining commands:
 
 ```bash
 export ASSISTANT_DIR="$HOME/wazuh-soc-assistant"
-export WAZUH_MCP_DIR="$HOME/Wazuh-MCP-Server-5.0.0"
+export WAZUH_MCP_DIR="$HOME/Wazuh-MCP-Server"
 ```
 
 If you cloned either repository to another location, change the matching path above before continuing. All later commands use these variables, so keep them set in this terminal.
@@ -139,17 +141,19 @@ nano "$ASSISTANT_DIR/privacy_config.json"
 
 Add only the ranges and terms you want treated as organization-specific. Enter IP ranges in CIDR notation (for example, `198.51.100.10/32` is documentation-only; replace it with a real range you own). Enter terms as JSON strings in double quotes, separated by commas. The example starts with both arrays empty, which is valid. Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X` in nano). You can edit this file later; restart the assistant and its Claude Code session after changes so they reload it. Do not commit `privacy_config.json`.
 
-## 3. Install the pinned Wazuh MCP release from source
+## 3. Install the Wazuh MCP server from your fork
 
-This build uses the community [Wazuh MCP Server](https://github.com/gensecaihq/Wazuh-MCP-Server) release `5.0.0`, pinned in [`integrations/wazuh-mcp-server.lock`](integrations/wazuh-mcp-server.lock). The server exposes Streamable HTTP. The local [`wazuh_http_bridge.py`](wazuh_http_bridge.py) connects to it, detokenizes Wazuh queries, and scrubs returned data before Claude receives it.
+This build uses your fork of the community [Wazuh MCP Server](https://github.com/gensecaihq/Wazuh-MCP-Server): [`efamharris/Wazuh-MCP-Server`](https://github.com/efamharris/Wazuh-MCP-Server). The replication steps clone its `main` branch. The fork does not automatically receive upstream changes. The server exposes Streamable HTTP. The local [`wazuh_http_bridge.py`](wazuh_http_bridge.py) connects to it, detokenizes Wazuh queries, and scrubs returned data before Claude receives it. The bridge was verified against upstream `v5.0.0`; the fork's current `main` must still pass the live setup checks in this guide before operational use.
 
-Clone the exact pinned Wazuh MCP release, create its own virtual environment, and install its Python package:
+Clone your fork, create its own virtual environment, and install its Python package:
 
 ```bash
+export ASSISTANT_DIR="${ASSISTANT_DIR:-$HOME/wazuh-soc-assistant}"
+export WAZUH_MCP_DIR="${WAZUH_MCP_DIR:-$HOME/Wazuh-MCP-Server}"
 cd "$HOME"
-git clone --branch 5.0.0 --depth 1 https://github.com/gensecaihq/Wazuh-MCP-Server.git "$WAZUH_MCP_DIR"
+git clone --branch main https://github.com/efamharris/Wazuh-MCP-Server.git "$WAZUH_MCP_DIR"
 cd "$WAZUH_MCP_DIR"
-git describe --tags --exact-match HEAD
+pwd
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -157,6 +161,8 @@ python -m pip install -e .
 cp "$ASSISTANT_DIR/integrations/wazuh-mcp-server.env.example" .env
 chmod 600 .env
 ```
+
+To evaluate a maintainer update, fetch it into a separate branch in your fork, review the changes, and test it against the bridge and your Wazuh VM. Merge it into your fork's `main` only after compatibility checks pass. Do not use GitHub's **Sync fork** action on `main` until you are ready to adopt and test those changes. Existing running installs stay as they are; a fresh clone uses the current contents of your fork's `main` branch.
 
 Edit the environment file:
 
@@ -184,22 +190,27 @@ PY
 chmod 600 .env
 ```
 
-Start the Wazuh MCP server in this terminal. Keep it running while testing the assistant; use a second SSH terminal for the remaining steps:
+Start the Wazuh MCP server in this terminal. The Python dotenv loader reads `.env` without interpreting credentials as shell commands. Keep it running while testing the assistant; use a second SSH terminal for the remaining steps:
 
 ```bash
 cd "$WAZUH_MCP_DIR"
 source .venv/bin/activate
-set -a
-. ./.env
-set +a
-MCP_HOST=127.0.0.1 MCP_PORT=3000 ENVIRONMENT=production python -m wazuh_mcp_server
+python - <<'PY'
+import os
+import sys
+from dotenv import load_dotenv
+
+load_dotenv(".env", override=True)
+os.environ.update({"MCP_HOST": "127.0.0.1", "MCP_PORT": "3000", "ENVIRONMENT": "production"})
+os.execvpe(sys.executable, [sys.executable, "-m", "wazuh_mcp_server"], os.environ)
+PY
 ```
 
 In the second SSH terminal, define the paths again and check readiness:
 
 ```bash
 export ASSISTANT_DIR="$HOME/wazuh-soc-assistant"
-export WAZUH_MCP_DIR="$HOME/Wazuh-MCP-Server-5.0.0"
+export WAZUH_MCP_DIR="$HOME/Wazuh-MCP-Server"
 curl -fsS http://127.0.0.1:3000/ready
 ```
 
@@ -260,7 +271,21 @@ claude mcp list
 
 Confirm that both `wazuh` and `shodan` appear and are connected before starting the web app. The local Wazuh MCP server process must be running whenever you use the assistant. If you later move the assistant checkout, remove and re-add its MCP entries because their commands contain absolute paths.
 
-## 7. Start the assistant
+## 7. Run the local verification checks
+
+Run these checks in the assistant checkout with its virtual environment active:
+
+```bash
+cd "$ASSISTANT_DIR"
+source venv/bin/activate
+python -m py_compile app.py privacy.py privacy_notes.py privacy_proxy.py wazuh_http_bridge.py test_app.py test_wazuh_http_bridge.py
+python test_privacy.py
+python -m unittest test_app.py test_wazuh_http_bridge.py
+```
+
+These checks verify the privacy behavior, Flask chat API, and bridge protocol against a local mock Wazuh MCP service. They do not replace the live readiness check and query below.
+
+## 8. Start the assistant and test a live query
 
 Start Flask using the same terminal where you installed/authenticated Claude Code. If you authenticated by signing in through Claude Code, run:
 
@@ -280,7 +305,13 @@ source venv/bin/activate
 python app.py
 ```
 
-Open <http://127.0.0.1:8080> in a browser on the same machine. Keep the app bound to `127.0.0.1`; this single-user UI has no login. Stop it with `Ctrl+C`. For a persistent local service, adapt [`deploy/soc-assistant.service.example`](deploy/soc-assistant.service.example) to your paths and user.
+Keep the app bound to `127.0.0.1`; this single-user UI has no login. If you are running on a remote, headless VM, create an SSH tunnel from your workstation in a separate local terminal:
+
+```bash
+ssh -N -L 8080:127.0.0.1:8080 YOUR_VM_USER@YOUR_VM_HOST
+```
+
+Then open <http://127.0.0.1:8080> in your local browser. Do not open port `8080` to the internet. In the app, try a read-only prompt such as: `Show the five most recent Wazuh alerts with their time, rule description, severity, and agent.` Confirm the response contains data from your deployment. Stop the Flask app with `Ctrl+C`. For a persistent local service, adapt [`deploy/soc-assistant.service.example`](deploy/soc-assistant.service.example) to your paths and user.
 
 ## Scope and operating notes
 
@@ -293,7 +324,7 @@ Open <http://127.0.0.1:8080> in a browser on the same machine. Keep the app boun
 
 ## Local data and secrets
 
-The app creates `history.db`, `pseudo.db`, and `audit.log` beside `app.py`. They may contain conversation text, pseudonym mappings, and tool-call metadata. Keep them local and protected; `.gitignore` excludes these files, the local privacy config, credentials, and virtual environments. Do not commit API keys, passwords, `.env` files, or local Claude configuration.
+The app creates `history.db`, `pseudo.db`, and `audit.log` beside `app.py`. They may contain conversation text, pseudonym mappings, Shodan query arguments, and privacy-filter summaries. Keep them local and protected; `.gitignore` excludes these files, the local privacy config, credentials, and virtual environments. Do not commit API keys, passwords, `.env` files, or local Claude configuration.
 
 ## Repository contents
 
@@ -305,6 +336,7 @@ The app creates `history.db`, `pseudo.db`, and `audit.log` beside `app.py`. They
 - `privacy_config.example.json`: safe starter configuration; copy it to the ignored local `privacy_config.json` and customize it.
 - `integrations/`: pinned MCP dependency metadata and a credential-free Wazuh MCP environment template.
 - `test_privacy.py`: privacy-layer self-check supplied with this build.
+- `test_app.py`: Flask API smoke tests with Claude mocked.
 - `test_wazuh_http_bridge.py`: local protocol check for bridge authentication, identifier restoration, and response scrubbing.
 - `deploy/`: local service-unit example.
 

@@ -43,16 +43,6 @@ def from_child():
             msg = json.loads(line)
         except ValueError:
             continue
-        if MODE == "wazuh" and isinstance(msg, dict) and ("result" in msg or "error" in msg):
-            try:
-                privacy.scrub_response(msg)
-                _t = json.dumps(msg, ensure_ascii=False)
-                _toks = sorted(set(m.group(0) for m in privacy.TOKEN_RE.finditer(_t)))
-                audit(event="scrubbed", chars=len(_t), tokens=_toks, redactions=_t.count("[REDACTED"),
-                      withheld=_t.count("full_log withheld"), truncated=_t.count("[truncated]"))
-            except Exception as e:
-                audit(event="scrub_error", error=str(e)[:200])
-                msg = error_result(msg.get("id"), "Privacy filter error: response withheld.")
         emit(msg)
     os._exit(child.wait())
 
