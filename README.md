@@ -97,8 +97,6 @@ If a command is missing, or `node --version` does not report an LTS release, res
 
 Python, Git, Node.js LTS, and Claude Code are installed from current supported releases. The Wazuh MCP integration clones the project maintainer's fork, [`efamharris/Wazuh-MCP-Server`](https://github.com/efamharris/Wazuh-MCP-Server), on its `main` branch. That fork does not automatically receive later changes from the original GenSecAI project, so the assistant setup is insulated from upstream changes until the project maintainer reviews and merges them. Shodan MCP `1.0.37` and the MCP Python SDK `2.3.0` are recorded in [`integrations/wazuh-mcp-server.lock`](integrations/wazuh-mcp-server.lock) and `requirements.txt`.
 
-See [`CHANGELOG.md`](CHANGELOG.md) for a concise record of project changes and verification status.
-
 ## 1. Clone this repository
 
 Run these commands from your home directory. They create `~/wazuh-soc-assistant`:
