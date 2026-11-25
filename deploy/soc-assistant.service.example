@@ -1,6 +1,7 @@
 [Unit]
 Description=SOC Assistant chat UI
-After=network.target
+After=network.target wazuh-mcp-server.service
+Requires=wazuh-mcp-server.service
 
 [Service]
 Type=simple

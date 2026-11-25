@@ -1,31 +1,30 @@
 # Changelog
 
-Notable changes to this project are recorded here so they are easy to review between commits. There is no formal release numbering yet.
+Notable project changes are recorded here so they are easy to review between commits. There is no formal release numbering yet.
 
-## Unreleased — stable MCP integration update
+## Unreleased — replication guide and service setup
 
 ### Changed
 
-- Updated the Wazuh integration from the previous stdio setup to the Wazuh MCP Server `5.0.0` Streamable HTTP endpoint.
-- Added `wazuh_http_bridge.py`, which obtains a short-lived bearer token, forwards Wazuh tool calls, detokenizes queries, and scrubs returned data before Claude receives it.
-- Updated the Wazuh `.env` example for the current TLS, bearer authentication, read-only scope, and toolset settings.
-- Pinned the local bridge dependencies to MCP Python SDK `2.3.0` and `httpx2` `2.16.0`.
-- Pinned the Shodan MCP command to `@burtthecoder/mcp-shodan` `1.0.37` and kept its local privacy proxy focused on Shodan requests.
-- Reworked the README setup steps for the selected integrations, including installing the Wazuh MCP server directly from the user's fork and registering both MCP servers with Claude Code.
-- Documented installing and running the Wazuh MCP server from source for the fresh-machine test.
-- Clarified that `privacy_config.json` is optional, described the built-in defaults, and explained how to add organization-specific terms later.
-- Made the Wazuh source-install commands initialize their default paths so they work in a fresh terminal session.
-- Corrected the Wazuh MCP source checkout to use its actual `v5.0.0` Git tag; `5.0.0` remains the release and package version.
-- Documented using the user's Wazuh MCP fork's `main` branch as the install source; upstream changes only enter it after deliberate sync or merge and testing.
-- Added Flask API smoke tests and documented local checks plus a live Wazuh query for a complete first-run verification.
-- Kept VM networking and browser access instructions generic rather than tied to a cloud provider.
+- Clarified the first-install sequence for the SOC Assistant, the maintained Wazuh MCP fork, Shodan MCP, Claude Code API-key authentication, and remote browser access.
+- Added copy/paste Bash commands to create the Wazuh Manager API `readonly` user and a least-privilege Indexer user, role, and mapping. Passwords are prompted without echo and JSON is escaped before requests are sent.
+- Made the Indexer setup block require an explicit `INDEXER_IP` replacement rather than defaulting to localhost, and named the credential prompt as the Wazuh Indexer `admin` password.
+- Made the Manager API account setup require an explicit `MANAGER_IP` replacement, added instructions for locating the `wazuh` API password in the assisted-installer archive, and added a clearly labeled password prompt that keeps the secret out of shell history and curl arguments.
+- Added networking guidance for distributed and all-in-one deployments, including when localhost works, the Dashboard's `opensearch.hosts` setting, service ports, and the distinction between bind addresses and port conflicts.
+- Clarified Wazuh Manager API password requirements and made the user-creation step report Wazuh's failure details instead of raising an `IndexError` when no user is returned.
+- Simplified the Indexer account setup so it asks once for the Indexer admin password and reuses it through a protected temporary curl config for user, role, and mapping creation.
+- Clarified that the MCP service unit and launcher come from the SOC Assistant checkout, while the Wazuh MCP virtual environment and `.env` must be created in the preceding install step.
+- Added systemd units for the Flask app and Wazuh MCP server. Both run in the background, start at boot, and write service logs to the system journal; the app service requires the MCP service.
+- Added a launcher that reads the maintained fork's `.env` and starts its Streamable HTTP service on loopback.
+- Stored the Anthropic API key once in a mode-600 file outside the repository. The app service loads it alongside absolute Claude CLI and Node.js `npx` paths, so restarts do not require re-entry or shell exports.
+- Added service-install guards for missing templates, launcher, virtual environments, credentials, and unreplaced username placeholders.
+- Clarified SSH tunnel authentication using the VM's existing username, host, private key, or SSH alias. Explained that `ssh -N` opens no remote shell and documented `Permission denied (publickey)`.
+- Clarified that privacy configuration is optional and can be tailored later, improved `/ready` troubleshooting, and expanded third-party credits.
+- The integration uses the project maintainer's Wazuh MCP fork `main` branch, while upstream changes remain separate until review and compatibility testing. Shodan MCP `1.0.37` and the local MCP Python SDK `2.3.0` remain recorded in the dependency files.
 
 ### Verification
 
-- Python compilation passed for the app, privacy modules, bridge, and test files.
-- `python test_privacy.py` passed its sanitization and round-trip checks.
-- `python -m unittest test_app.py test_wazuh_http_bridge.py` passed: Flask API smoke tests and bridge authentication, tool discovery/calls, detokenization, and response scrubbing against a local mock MCP service.
-- The Wazuh MCP Server `v5.0.0` source checkout installed successfully in a clean Python 3.12 virtual environment, and `python -m wazuh_mcp_server --help` ran successfully.
-- Against the actual Wazuh MCP Server `v5.0.0` process with test-only credentials, this repo's bridge authenticated and listed 35 read-only tools; write actions and web search were absent.
-- `pip check` and `git diff --check` passed.
-- The live Wazuh deployment has not been tested as part of this update; validate it with your own Manager and Indexer before relying on it operationally.
+- Earlier build verification recorded Python compilation, privacy checks, bridge/app unit tests, package checks, and MCP discovery against the maintained fork at commit `e751871`.
+- On the user's test VM, `/ready` returned HTTP 200 with Manager, Indexer, memory, and MCP healthy. The Flask systemd service was active and its UI returned HTTP 200.
+- The full browser-to-Claude-to-Wazuh query and a fresh-VM run of the new Wazuh MCP systemd service still need confirmation.
+- In this update, all 28 README Bash blocks passed `bash -n`; `deploy/run_wazuh_mcp_server.py` passed Python compilation; both rendered systemd units passed `systemd-analyze verify`; `git diff --check` passed.

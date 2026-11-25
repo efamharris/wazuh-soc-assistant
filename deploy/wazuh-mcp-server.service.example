@@ -1,0 +1,16 @@
+[Unit]
+Description=Wazuh MCP Server for SOC Assistant
+After=network.target
+
+[Service]
+Type=simple
+User=<YOUR_LINUX_USER>
+WorkingDirectory=/home/<YOUR_LINUX_USER>/Wazuh-MCP-Server
+Environment=WAZUH_MCP_DIR=/home/<YOUR_LINUX_USER>/Wazuh-MCP-Server
+ExecStart=/home/<YOUR_LINUX_USER>/Wazuh-MCP-Server/.venv/bin/python /home/<YOUR_LINUX_USER>/wazuh-soc-assistant/deploy/run_wazuh_mcp_server.py
+Restart=on-failure
+RestartSec=5
+UMask=077
+
+[Install]
+WantedBy=multi-user.target
