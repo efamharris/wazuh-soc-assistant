@@ -6,7 +6,7 @@ This repository contains the assistant application and its privacy components. I
 
 ## Minimum system requirements
 
-These are baseline requirements for one analyst using the app locally. The Wazuh deployment is expected to be on a separate reachable system; this minimum is not enough to host a Wazuh stack as well.
+These are baseline requirements for the Assistant VM for one analyst. Wazuh may be on separate VMs or on the same host; running the full Wazuh stack on the Assistant host requires additional resources beyond this table.
 
 | Resource | Minimum / baseline |
 | --- | --- |
@@ -38,9 +38,7 @@ For an **all-in-one installation** where the Assistant, Manager, Indexer, and Da
 
 ## Before you start
 
-Run the steps in order on the SOC Assistant VM, except where a section says to use a Wazuh host or your workstation. Keep the setup shell open while using its exported path variables. Before using the assistant, customize only the items listed here:
-
-Complete Steps 1–8 in order. The MCP registration steps add the Wazuh privacy bridge and Shodan proxy to Claude Code so the assistant can use both integrations.
+Run Steps 1–8 in order on the SOC Assistant VM, except where a section says to use a Wazuh host or your workstation. Keep the setup shell open while using its exported path variables. The MCP registration steps add the Wazuh privacy bridge and Shodan proxy to Claude Code. Before using the assistant, customize only the items listed here:
 
 | File or prompt | What you must supply |
 | --- | --- |
@@ -68,28 +66,16 @@ sudo apt install -y python3 python3-venv python3-pip git curl ca-certificates
 Install the current Node.js LTS release with nvm. The Ubuntu archive may provide a different Node.js major version; nvm lets this guide select the current LTS line. The installer below is the tagged installer from the [nvm project](https://github.com/nvm-sh/nvm):
 
 ```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh | bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.41.0/install.sh | bash
 source ~/.bashrc
 nvm install --lts
 nvm alias default 'lts/*'
 ```
 
-Check Node.js and npm are available and on the expected major version:
-
-```bash
-node --version
-npm --version
-npx --version
-```
-
-`node --version` should report an LTS release. npm and npx are installed with Node.js. If `nvm` is not found after installation, close and reopen the terminal, then run `source ~/.bashrc` and repeat the Node.js commands.
-
 Install Claude Code globally for your user. Do not add `sudo` to the npm command:
 
 ```bash
 npm install -g @anthropic-ai/claude-code@latest
-claude --version
-claude doctor
 ```
 
 Create an Anthropic API key in the [Anthropic Console](https://console.anthropic.com/). This setup uses API-key authentication for every replica; do not run `claude` to sign in with a Claude account. Step 8 securely prompts for the key once and stores it in a permission-protected config file outside the repository, where the app service reads it on every start. Do not put the key in a command or commit it to this repository. See [Anthropic's Claude Code setup guide](https://docs.anthropic.com/en/docs/claude-code/getting-started) for API-key configuration details.
@@ -105,7 +91,7 @@ npx --version
 claude --version
 ```
 
-If a command is missing, or Node.js is not on an LTS release, resolve that before continuing.
+If a command is missing, or `node --version` does not report an LTS release, resolve that before continuing. If `nvm` is not found after installation, close and reopen the terminal, then run `source ~/.bashrc` and repeat this final check.
 
 ### Version and update policy
 
@@ -165,12 +151,9 @@ This guide installs the community [Wazuh MCP Server](https://github.com/gensecai
 Clone the maintained fork, create its own virtual environment, and install the MCP server package. These are the source checkout commands for a fresh replication:
 
 ```bash
-export ASSISTANT_DIR="${ASSISTANT_DIR:-$HOME/wazuh-soc-assistant}"
-export WAZUH_MCP_DIR="${WAZUH_MCP_DIR:-$HOME/Wazuh-MCP-Server}"
 cd "$HOME"
 git clone --branch main https://github.com/efamharris/Wazuh-MCP-Server.git "$WAZUH_MCP_DIR"
 cd "$WAZUH_MCP_DIR"
-pwd
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -249,16 +232,24 @@ print(items[0]["id"])
 ')"
 curl -skS --fail-with-body -H "Authorization: Bearer $WAZUH_API_TOKEN" -X POST \
   "$WAZUH_API_BASE/security/users/$MANAGER_USER_ID/roles?role_ids=$MANAGER_ROLE_ID"
-echo "When curl prompts next, enter the new read-only Manager API password for user ${MANAGER_RO_USER}."
-MANAGER_RO_TOKEN="$(curl -skS --fail-with-body -u "$MANAGER_RO_USER" -X POST \
+MANAGER_RO_CURL_CONFIG="$(mktemp)"
+chmod 600 "$MANAGER_RO_CURL_CONFIG"
+trap 'rm -f "$MANAGER_RO_CURL_CONFIG"' EXIT
+MANAGER_RO_CURL_USER="$(MANAGER_RO_USER="$MANAGER_RO_USER" MANAGER_RO_PASS="$MANAGER_RO_PASS" \
+  python3 -c 'import json,os; print(json.dumps(os.environ["MANAGER_RO_USER"]+":"+os.environ["MANAGER_RO_PASS"]))')"
+printf 'user = %s\n' "$MANAGER_RO_CURL_USER" > "$MANAGER_RO_CURL_CONFIG"
+unset MANAGER_RO_CURL_USER MANAGER_RO_PASS
+MANAGER_RO_TOKEN="$(curl --config "$MANAGER_RO_CURL_CONFIG" -skS --fail-with-body -X POST \
   "$WAZUH_API_BASE/security/user/authenticate?raw=true")"
+rm -f "$MANAGER_RO_CURL_CONFIG"
+trap - EXIT
 curl -skS --fail-with-body -o /dev/null -w 'Manager read check: HTTP %{http_code}\n' \
   -H "Authorization: Bearer $MANAGER_RO_TOKEN" "$WAZUH_API_BASE/agents?limit=1"
-unset WAZUH_API_TOKEN MANAGER_RO_TOKEN MANAGER_RO_PASS MANAGER_USER_JSON MANAGER_USER_RESPONSE
+unset WAZUH_API_TOKEN MANAGER_RO_TOKEN MANAGER_USER_JSON MANAGER_USER_RESPONSE
 )
 ```
 
-The first `curl -u` call prompts for the **Wazuh Manager API admin password** for the admin username entered above (default `wazuh`). The script looks up the `readonly` role ID rather than assuming it is `2`, creates the user, assigns that role, then authenticates as the new user and verifies an agent read returns HTTP 200. Record the new username and password in a password manager for the MCP `.env` file; the script does not print the password. This is a one-time administrator operation; do not put the admin password in `.env`. If that username already exists, do not rerun the `POST` create command; verify the existing account's role and use its existing credentials.
+The block prompts once for the **Wazuh Manager API admin password** for the admin username entered above (default `wazuh`) and once for the new read-only account password. It looks up the `readonly` role ID rather than assuming it is `2`, creates the user, assigns that role, then authenticates as the new user and verifies an agent read returns HTTP 200. The read-only password is reused from a protected temporary curl config, so curl does not prompt for it again or expose it in its command-line arguments. Record the new username and password in a password manager for the MCP `.env` file; the script does not print the password. This is a one-time administrator operation; do not put the admin password in `.env`. If that username already exists, do not rerun the `POST` create command; verify the existing account's role and use its existing credentials.
 
 Create the Indexer internal user and its read-only role with the Security REST API. Run these commands from a terminal that can reach the Indexer. Before running the block, replace `INDEXER_IP` with the Indexer's reachable IP address (for example, its private IP) or DNS name. Do not leave it as `INDEXER_IP`; `localhost` is correct only when the command runs on the Indexer VM itself. Choose and record a strong new read-only user's password before running this block; avoid whitespace so it is easy to enter in `.env`. The block prompts once for the **Wazuh Indexer admin password for the `admin` account**, then reuses it securely for the three setup requests. This is not the Wazuh Manager API admin password or the new read-only user's password. As above, `-k` is for a default self-signed certificate; use certificate verification for a trusted CA.
 
@@ -307,16 +298,33 @@ INDEXER_CURL_USER="$(INDEXER_RO_USER="$INDEXER_RO_USER" INDEXER_RO_PASS="$INDEXE
   python3 -c 'import json,os; print(json.dumps(os.environ["INDEXER_RO_USER"]+":"+os.environ["INDEXER_RO_PASS"]))')"
 printf 'user = %s\n' "$INDEXER_CURL_USER" > "$INDEXER_CURL_CONFIG"
 unset INDEXER_CURL_USER INDEXER_RO_PASS
+INDEXER_ACCOUNT="$(curl --config "$INDEXER_CURL_CONFIG" -skS --fail-with-body \
+  "$INDEXER_SECURITY_API/account")"
+INDEXER_ACCOUNT_CHECK="$(printf '%s' "$INDEXER_ACCOUNT" \
+  | INDEXER_RO_USER="$INDEXER_RO_USER" python3 -c '
+import json,os,sys
+account=json.load(sys.stdin)
+roles=account.get("roles", [])
+if account.get("user_name") != os.environ["INDEXER_RO_USER"]:
+    print("Indexer authenticated a different username than the one configured.", file=sys.stderr)
+    sys.exit(1)
+if "soc_assistant_readonly" not in roles:
+    print("Indexer user is authenticated but is missing the soc_assistant_readonly role mapping.", file=sys.stderr)
+    print("Effective roles: " + ", ".join(roles), file=sys.stderr)
+    sys.exit(1)
+print("Indexer role mapping verified for " + account["user_name"])
+')"
+printf '%s\n' "$INDEXER_ACCOUNT_CHECK"
 curl --config "$INDEXER_CURL_CONFIG" -skS --fail-with-body -o /dev/null \
   -w 'Indexer cluster-health check: HTTP %{http_code}\n' \
   "https://${INDEXER_HOST}:9200/_cluster/health"
 rm -f "$INDEXER_CURL_CONFIG"
 trap - EXIT
-unset INDEXER_USER_JSON INDEXER_MAPPING_JSON
+unset INDEXER_USER_JSON INDEXER_MAPPING_JSON INDEXER_ACCOUNT INDEXER_ACCOUNT_CHECK
 )
 ```
 
-The block prompts once for each password: first the new read-only Indexer password, then the **Wazuh Indexer admin password for account `admin`**. It creates the internal user, the read-only role, and the role mapping, then authenticates as the new user to confirm its cluster-health permission returns HTTP 200. The Indexer role grants only cluster health checks and read access to the alert and vulnerability indices used by this setup; it grants no write permission. The role and mapping names can be changed, but use the same role name in both API requests. See the [OpenSearch Security REST API](https://docs.opensearch.org/latest/security/api/index/) for these endpoints and the Wazuh [RBAC documentation](https://documentation.wazuh.com/current/user-manual/api/rbac/configuration.html) for Manager users and role assignment.
+The block prompts once for each password: first the new read-only Indexer password, then the **Wazuh Indexer admin password for account `admin`**. It creates the internal user, the read-only role, and the role mapping, then authenticates as the new user and verifies that the effective roles include `soc_assistant_readonly` before checking cluster health. Continue only when the block reports `Indexer role mapping verified` and `Indexer cluster-health check: HTTP 200`. The role grants only cluster health checks and read access to the alert and vulnerability indices used by this setup; it grants no write permission. The role and mapping names can be changed, but use the same role name in both API requests. See the [OpenSearch Security REST API](https://docs.opensearch.org/latest/security/api/index/) for these endpoints and the Wazuh [RBAC documentation](https://documentation.wazuh.com/current/user-manual/api/rbac/configuration.html) for Manager users and role assignment.
 
 After creating both accounts, store only their dedicated read-only usernames and passwords in the MCP `.env`. Do not place administrator credentials there. The Indexer account does not need write access.
 
@@ -346,18 +354,7 @@ PY
 chmod 600 .env
 ```
 
-Run the Wazuh MCP server as a systemd service so it stays in the background and starts automatically after a VM reboot. The service launcher loads the maintained fork's `.env` file using its own virtual environment. If you already started it in a foreground terminal, stop that process with `Ctrl+C`. If you started it with the earlier background command, stop that process and remove its old PID file before starting the service:
-
-```bash
-if [ -f "$HOME/.local/run/wazuh-mcp-server.pid" ]; then
-  OLD_MCP_PID="$(cat "$HOME/.local/run/wazuh-mcp-server.pid")"
-  if ps -p "$OLD_MCP_PID" -o args= 2>/dev/null | grep -q '[w]azuh_mcp_server'; then
-    kill "$OLD_MCP_PID"
-  fi
-  rm "$HOME/.local/run/wazuh-mcp-server.pid"
-  unset OLD_MCP_PID
-fi
-```
+Run the Wazuh MCP server as a systemd service so it stays in the background and starts automatically after a VM reboot. The service launcher loads the maintained fork's `.env` file using its own virtual environment.
 
 Install and start the service only after completing Step 3, including creating the Wazuh MCP checkout's `.venv` and `.env`. The service template and launcher are supplied by this SOC Assistant repository under `$ASSISTANT_DIR/deploy`; they are not files from the Wazuh MCP fork. If cloning the Assistant from GitHub, use a commit that includes both files. These commands fill in the Linux username in the service template; if either checkout is in a non-default directory, edit the template paths before installing it. They check that both service files exist, so an older Assistant checkout stops with a clear message instead of writing an empty unit:
 
@@ -386,8 +383,6 @@ Check that the printed service settings show the real username and paths, with n
 Check readiness from the same VM terminal:
 
 ```bash
-export ASSISTANT_DIR="$HOME/wazuh-soc-assistant"
-export WAZUH_MCP_DIR="$HOME/Wazuh-MCP-Server"
 curl -sS -i http://127.0.0.1:3000/ready
 ```
 
@@ -444,14 +439,13 @@ Confirm that both `wazuh` and `shodan` appear and are connected before starting 
 Run these basic checks in the assistant checkout with its virtual environment active. They check Python syntax and the built-in privacy behavior without requiring separate test files:
 
 ```bash
-export ASSISTANT_DIR="$HOME/wazuh-soc-assistant"
 cd "$ASSISTANT_DIR"
 source venv/bin/activate
 python -m py_compile app.py privacy.py privacy_notes.py privacy_proxy.py wazuh_http_bridge.py deploy/run_wazuh_mcp_server.py
 python test_privacy.py
 ```
 
-Continue to the live readiness check and Wazuh query below to verify the integration with your deployment.
+Proceed to Step 8 for the browser UI and a live Wazuh query. The Wazuh MCP readiness check was completed in Step 3.
 
 ## 8. Start the assistant and test a live query
 
@@ -462,7 +456,6 @@ The Flask app and Wazuh MCP server both run as systemd services on the VM, in th
 On the VM, set the assistant path, then create the protected service config file. The API key is prompted without echo. The config also records the Claude CLI path and the Node.js `npx` directory because systemd does not inherit the interactive shell's PATH; Claude Code needs `npx` to launch the Shodan MCP. These values are stored outside the Git checkout. Do this once, or again if you rotate the key or change your Node.js/Claude installation:
 
 ```bash
-export ASSISTANT_DIR="$HOME/wazuh-soc-assistant"
 install -d -m 700 "$HOME/.config/soc-assistant"
 umask 077
 read -rsp 'Anthropic API key: ' ANTHROPIC_API_KEY; echo
@@ -507,15 +500,13 @@ fi
 
 The `sed` expression must replace the template's literal `<YOUR_LINUX_USER>` placeholder. Check the printed service settings: they should contain the actual Linux username and paths, with no `<YOUR_LINUX_USER>` text remaining.
 
-Check both services and their endpoints on the VM:
+Check the app endpoint on the VM:
 
 ```bash
-sudo systemctl status soc-assistant wazuh-mcp-server --no-pager
-curl -sS -i http://127.0.0.1:3000/ready
 curl -sS -I http://127.0.0.1:8080
 ```
 
-The UI should return HTTP 200, and `/ready` should return HTTP 200 with `"status":"healthy"`. If either check fails, inspect `sudo journalctl -u soc-assistant -n 50 --no-pager` or `sudo journalctl -u wazuh-mcp-server -n 50 --no-pager`. On later starts or after changing a service configuration, use `sudo systemctl restart soc-assistant wazuh-mcp-server`. The API key is loaded from the protected file; you do not need to enter or export it again.
+The UI should return HTTP 200. If it does not, inspect `sudo journalctl -u soc-assistant -n 50 --no-pager`. Wazuh readiness was already checked in Step 3; if the live query fails, inspect `sudo journalctl -u wazuh-mcp-server -n 50 --no-pager`. On later starts or after changing a service configuration, use `sudo systemctl restart soc-assistant wazuh-mcp-server`. The API key is loaded from the protected file; you do not need to enter or export it again.
 
 If you later update Node.js or Claude Code and their executable paths change, refresh only those paths without re-entering the API key:
 
